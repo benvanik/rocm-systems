@@ -863,12 +863,13 @@ GlobalAtomicSwapB32Vglobal::GlobalAtomicSwapB32Vglobal(const MachineInst *inst)
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(32, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -904,12 +905,13 @@ GlobalAtomicCmpswapB32Vglobal::GlobalAtomicCmpswapB32Vglobal(const MachineInst *
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(64, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -947,12 +949,13 @@ GlobalAtomicAddU32Vglobal::GlobalAtomicAddU32Vglobal(const MachineInst *inst)
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(32, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -988,12 +991,13 @@ GlobalAtomicSubU32Vglobal::GlobalAtomicSubU32Vglobal(const MachineInst *inst)
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(32, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -1029,12 +1033,13 @@ GlobalAtomicSubClampU32Vglobal::GlobalAtomicSubClampU32Vglobal(const MachineInst
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(32, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -1070,12 +1075,13 @@ GlobalAtomicMinI32Vglobal::GlobalAtomicMinI32Vglobal(const MachineInst *inst)
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(32, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -1111,12 +1117,13 @@ GlobalAtomicMinU32Vglobal::GlobalAtomicMinU32Vglobal(const MachineInst *inst)
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(32, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -1152,12 +1159,13 @@ GlobalAtomicMaxI32Vglobal::GlobalAtomicMaxI32Vglobal(const MachineInst *inst)
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(32, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -1193,12 +1201,13 @@ GlobalAtomicMaxU32Vglobal::GlobalAtomicMaxU32Vglobal(const MachineInst *inst)
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(32, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -1234,12 +1243,13 @@ GlobalAtomicAndB32Vglobal::GlobalAtomicAndB32Vglobal(const MachineInst *inst)
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(32, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -1275,12 +1285,13 @@ GlobalAtomicOrB32Vglobal::GlobalAtomicOrB32Vglobal(const MachineInst *inst)
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(32, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -1316,12 +1327,13 @@ GlobalAtomicXorB32Vglobal::GlobalAtomicXorB32Vglobal(const MachineInst *inst)
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(32, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -1357,12 +1369,13 @@ GlobalAtomicIncU32Vglobal::GlobalAtomicIncU32Vglobal(const MachineInst *inst)
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(32, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -1398,12 +1411,13 @@ GlobalAtomicDecU32Vglobal::GlobalAtomicDecU32Vglobal(const MachineInst *inst)
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(32, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -1439,12 +1453,13 @@ GlobalAtomicSwapB64Vglobal::GlobalAtomicSwapB64Vglobal(const MachineInst *inst)
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(64, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -1482,12 +1497,13 @@ GlobalAtomicCmpswapB64Vglobal::GlobalAtomicCmpswapB64Vglobal(const MachineInst *
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(128, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -1529,12 +1545,13 @@ GlobalAtomicAddU64Vglobal::GlobalAtomicAddU64Vglobal(const MachineInst *inst)
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(64, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -1572,12 +1589,13 @@ GlobalAtomicSubU64Vglobal::GlobalAtomicSubU64Vglobal(const MachineInst *inst)
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(64, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -1615,12 +1633,13 @@ GlobalAtomicMinI64Vglobal::GlobalAtomicMinI64Vglobal(const MachineInst *inst)
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(64, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -1658,12 +1677,13 @@ GlobalAtomicMinU64Vglobal::GlobalAtomicMinU64Vglobal(const MachineInst *inst)
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(64, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -1701,12 +1721,13 @@ GlobalAtomicMaxI64Vglobal::GlobalAtomicMaxI64Vglobal(const MachineInst *inst)
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(64, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -1744,12 +1765,13 @@ GlobalAtomicMaxU64Vglobal::GlobalAtomicMaxU64Vglobal(const MachineInst *inst)
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(64, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -1787,12 +1809,13 @@ GlobalAtomicAndB64Vglobal::GlobalAtomicAndB64Vglobal(const MachineInst *inst)
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(64, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -1830,12 +1853,13 @@ GlobalAtomicOrB64Vglobal::GlobalAtomicOrB64Vglobal(const MachineInst *inst)
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(64, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -1873,12 +1897,13 @@ GlobalAtomicXorB64Vglobal::GlobalAtomicXorB64Vglobal(const MachineInst *inst)
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(64, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -1916,12 +1941,13 @@ GlobalAtomicIncU64Vglobal::GlobalAtomicIncU64Vglobal(const MachineInst *inst)
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(64, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -1959,12 +1985,13 @@ GlobalAtomicDecU64Vglobal::GlobalAtomicDecU64Vglobal(const MachineInst *inst)
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(64, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -2011,12 +2038,13 @@ GlobalAtomicCondSubU32Vglobal::GlobalAtomicCondSubU32Vglobal(const MachineInst *
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(32, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -2052,12 +2080,13 @@ GlobalAtomicMinNumF32Vglobal::GlobalAtomicMinNumF32Vglobal(const MachineInst *in
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(32, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -2093,12 +2122,13 @@ GlobalAtomicMaxNumF32Vglobal::GlobalAtomicMaxNumF32Vglobal(const MachineInst *in
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(32, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -2261,12 +2291,13 @@ GlobalAtomicAddF32Vglobal::GlobalAtomicAddF32Vglobal(const MachineInst *inst)
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(32, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -2360,12 +2391,13 @@ GlobalAtomicPkAddF16Vglobal::GlobalAtomicPkAddF16Vglobal(const MachineInst *inst
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(32, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -2401,12 +2433,13 @@ GlobalAtomicPkAddBf16Vglobal::GlobalAtomicPkAddBf16Vglobal(const MachineInst *in
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(32, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
@@ -2442,12 +2475,13 @@ GlobalAtomicOrderedAddB64Vglobal::GlobalAtomicOrderedAddB64Vglobal(const Machine
             reinterpret_cast<const OpEncoding *>(inst)->vaddr),
       vsrc(64, OperandType::OPR_VGPR, reinterpret_cast<const OpEncoding *>(inst)->vsrc),
       saddr(64, OperandType::OPR_SREG, reinterpret_cast<const OpEncoding *>(inst)->saddr) {
-  dst_operands_[0] = &vdst;
   src_operands_[0] = &vaddr;
   src_operands_[1] = &vsrc;
   src_operands_[2] = &saddr;
   num_src_ = 3;
-  num_dst_ = 1;
+  num_dst_ = 0;
+  if (amdgpu::gfx12_atomic_returns(inst_.th))
+    dst_operands_[num_dst_++] = &vdst;
   flags_ |= MEMORY_OP;
 }
 
