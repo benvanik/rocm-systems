@@ -2358,6 +2358,25 @@ class CodeGenerator:
             and self.isa_spec.profile.vop3_cmp_sdst_size_bits is not None
         ):
             return str(self.isa_spec.profile.vop3_cmp_sdst_size_bits)
+        if (
+            sem is not None
+            and sem.semantic_class == 'vector_cndmask'
+            and enc_name.upper() == 'ENC_VOP3'
+            and not opnd.is_output
+            and opnd.name == 'src2'
+            and opnd.operand_type.upper() == 'OPR_SREG'
+            and self.isa_spec.profile.vop3_cndmask_selector_size_bits is not None
+        ):
+            return str(self.isa_spec.profile.vop3_cndmask_selector_size_bits)
+        if (
+            sem is not None
+            and sem.semantic_class == 'vector_add_co'
+            and enc_name.upper() == 'ENC_VOP3'
+            and opnd.name in ('sdst', 'src2')
+            and opnd.operand_type.upper() == 'OPR_SREG'
+            and self.isa_spec.profile.vop3_carry_mask_size_bits is not None
+        ):
+            return str(self.isa_spec.profile.vop3_carry_mask_size_bits)
         return None
 
     _VGPR_MSB_SRC_ROLES = ('Src0', 'Src1', 'Src2')
@@ -3339,9 +3358,8 @@ class CodeGenerator:
                     if inst.name in ('V_CVT_F16_FP8', 'V_CVT_F16_BF8'):
                         lctx.fp8_byte_select = f'({vop3_opsel} & 0x2u) >> 1'
                 if cls == 'vector_cndmask' and is_vop3 and len(src_ops) >= 3:
-                    lctx.vcc_read = (
-                        f'amdgpu::RegisterAccess(wf).read_scalar64({src_ops[2]})'
-                    )
+                    selector_read = f'amdgpu::read_wave_mask_scalar({src_ops[2]}, wf)'
+                    lctx.vcc_read = selector_read
                     if inst.name == 'V_CNDMASK_B32':
                         return (
                             '  uint64_t exec = wf.exec();\n'
@@ -3350,7 +3368,7 @@ class CodeGenerator:
                             '      continue;\n'
                             f'    const uint32_t src0_value = apply_vop3_b32_src_mod(amdgpu::RegisterAccess(wf).read_lane({src_ops[0]}, lane), inst_.abs, inst_.neg, 0);\n'
                             f'    const uint32_t src1_value = apply_vop3_b32_src_mod(amdgpu::RegisterAccess(wf).read_lane({src_ops[1]}, lane), inst_.abs, inst_.neg, 1);\n'
-                            f'    amdgpu::RegisterAccess(wf).write_lane({dst_ops[0]}, lane, ((amdgpu::RegisterAccess(wf).read_scalar64({src_ops[2]}) >> lane) & 1) ? src1_value : src0_value);\n'
+                            f'    amdgpu::RegisterAccess(wf).write_lane({dst_ops[0]}, lane, (({selector_read} >> lane) & 1) ? src1_value : src0_value);\n'
                             '  }\n'
                         )
                 if (
@@ -3428,7 +3446,7 @@ class CodeGenerator:
                 if cls == 'vector_add_co':
                     if is_vop3 and len(src_ops) >= 3:
                         lctx.vcc_read = (
-                            f'amdgpu::RegisterAccess(wf).read_scalar64({src_ops[2]})'
+                            f'amdgpu::read_wave_mask_scalar({src_ops[2]}, wf)'
                         )
                     lctx.vcc_dst = dst_ops[1] if len(dst_ops) > 1 else '__vcc__'
                 body = lower_sema_block(sema_block, lctx)

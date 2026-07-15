@@ -2836,7 +2836,7 @@ inline void execute_v_add_co_ci_u32_vop3([[maybe_unused]] Inst &inst,
       uint64_t w = static_cast<uint64_t>(amdgpu::RegisterAccess(wf).read_lane(inst.src0, lane)) +
                    static_cast<uint64_t>(amdgpu::RegisterAccess(wf).read_lane(inst.src1, lane)) +
                    static_cast<uint64_t>(
-                       ((amdgpu::RegisterAccess(wf).read_scalar64(inst.src2) >> lane) & 1));
+                       ((amdgpu::read_wave_mask_scalar(inst.src2, wf) >> lane) & 1));
       if (w > 0xFFFFFFFFULL)
         vcc |= (1ULL << lane);
       else
@@ -3266,7 +3266,7 @@ inline void execute_v_addc_co_u32_vop3([[maybe_unused]] Inst &inst,
       uint64_t w = static_cast<uint64_t>(amdgpu::RegisterAccess(wf).read_lane(inst.src0, lane)) +
                    static_cast<uint64_t>(amdgpu::RegisterAccess(wf).read_lane(inst.src1, lane)) +
                    static_cast<uint64_t>(
-                       ((amdgpu::RegisterAccess(wf).read_scalar64(inst.src2) >> lane) & 1));
+                       ((amdgpu::read_wave_mask_scalar(inst.src2, wf) >> lane) & 1));
       if (w > 0xFFFFFFFFULL)
         vcc |= (1ULL << lane);
       else
@@ -8246,9 +8246,9 @@ inline void execute_v_cndmask_b32_vop3([[maybe_unused]] Inst &inst,
     const uint32_t src1_value = apply_vop3_b32_src_mod(
         amdgpu::RegisterAccess(wf).read_lane(inst.src1, lane), inst.inst_.abs, inst.inst_.neg, 1);
     amdgpu::RegisterAccess(wf).write_lane(
-        inst.vdst, lane,
-        ((amdgpu::RegisterAccess(wf).read_scalar64(inst.src2) >> lane) & 1) ? src1_value
-                                                                            : src0_value);
+        inst.vdst, lane, ((amdgpu::read_wave_mask_scalar(inst.src2, wf) >> lane) & 1)
+                             ? src1_value
+                             : src0_value);
   }
 }
 
@@ -18470,7 +18470,7 @@ inline void execute_v_sub_co_ci_u32_vop3([[maybe_unused]] Inst &inst,
       uint64_t a = static_cast<uint64_t>(amdgpu::RegisterAccess(wf).read_lane(inst.src0, lane)),
                b = static_cast<uint64_t>(amdgpu::RegisterAccess(wf).read_lane(inst.src1, lane)),
                c = static_cast<uint64_t>(
-                   ((amdgpu::RegisterAccess(wf).read_scalar64(inst.src2) >> lane) & 1));
+                   ((amdgpu::read_wave_mask_scalar(inst.src2, wf) >> lane) & 1));
       if (a < b + c)
         vcc |= (1ULL << lane);
       else
@@ -18819,7 +18819,7 @@ inline void execute_v_subb_co_u32_vop3([[maybe_unused]] Inst &inst,
       uint64_t a = static_cast<uint64_t>(amdgpu::RegisterAccess(wf).read_lane(inst.src0, lane)),
                b = static_cast<uint64_t>(amdgpu::RegisterAccess(wf).read_lane(inst.src1, lane)),
                c = static_cast<uint64_t>(
-                   ((amdgpu::RegisterAccess(wf).read_scalar64(inst.src2) >> lane) & 1));
+                   ((amdgpu::read_wave_mask_scalar(inst.src2, wf) >> lane) & 1));
       if (a < b + c)
         vcc |= (1ULL << lane);
       else
@@ -18881,7 +18881,7 @@ inline void execute_v_subbrev_co_u32_vop3([[maybe_unused]] Inst &inst,
       uint64_t a = static_cast<uint64_t>(amdgpu::RegisterAccess(wf).read_lane(inst.src1, lane)),
                b = static_cast<uint64_t>(amdgpu::RegisterAccess(wf).read_lane(inst.src0, lane)),
                c = static_cast<uint64_t>(
-                   ((amdgpu::RegisterAccess(wf).read_scalar64(inst.src2) >> lane) & 1));
+                   ((amdgpu::read_wave_mask_scalar(inst.src2, wf) >> lane) & 1));
       if (a < b + c)
         vcc |= (1ULL << lane);
       else
@@ -18936,7 +18936,7 @@ inline void execute_v_subrev_co_ci_u32_vop3([[maybe_unused]] Inst &inst,
       uint64_t a = static_cast<uint64_t>(amdgpu::RegisterAccess(wf).read_lane(inst.src1, lane)),
                b = static_cast<uint64_t>(amdgpu::RegisterAccess(wf).read_lane(inst.src0, lane)),
                c = static_cast<uint64_t>(
-                   ((amdgpu::RegisterAccess(wf).read_scalar64(inst.src2) >> lane) & 1));
+                   ((amdgpu::read_wave_mask_scalar(inst.src2, wf) >> lane) & 1));
       if (a < b + c)
         vcc |= (1ULL << lane);
       else
