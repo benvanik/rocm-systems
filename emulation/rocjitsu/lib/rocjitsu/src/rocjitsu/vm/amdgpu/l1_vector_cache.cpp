@@ -48,16 +48,21 @@ void L1VectorCache::ensure_line(uint64_t addr, uint32_t vmid) {
   if (cache_.lookup(addr, nullptr, vmid))
     return;
 
+  fetch_line(addr, vmid);
+}
+
+const uint8_t *L1VectorCache::fetch_line(uint64_t addr, uint32_t vmid) {
   uint64_t line_addr = CacheStore::line_address(addr);
   simdojo::CacheTag evicted;
-  uint8_t evicted_data[LINE_SIZE];
-  cache_.allocate(addr, vmid, &evicted, evicted_data);
+  auto allocated = cache_.allocate_with_data(addr, vmid, &evicted);
 
   assert(!evicted.dirty && "L1 V$ is write-through; lines should never be dirty");
 
-  uint8_t line_buf[LINE_SIZE];
-  l2_->fetch_line(line_addr, line_buf, vmid);
-  cache_.fill_line(addr, line_buf, vmid);
+  l2_->fetch_line(line_addr, allocated.data, vmid);
+  cached_read_line_addr_ = line_addr;
+  cached_read_line_vmid_ = vmid;
+  cached_read_line_data_ = allocated.data;
+  return allocated.data;
 }
 
 // Per-line CC invalidation is sufficient: the CP serializes dispatch N's cache
@@ -66,11 +71,12 @@ void L1VectorCache::ensure_line(uint64_t addr, uint32_t vmid) {
 void L1VectorCache::read_bytes(uint64_t addr, uint8_t *dst, uint32_t size, Mtype mtype,
                                bool non_temporal, bool request_l1_bypass, uint32_t vmid) {
   Mtype inst_mtype = mtype;
-  Mtype effective = mtype;
-  if (memory_)
-    effective = effective_mtype(mtype, memory_->pte_mtype(addr, vmid));
+  ++read_count_;
 
   util::Logger::cp([&](auto &os) {
+    Mtype effective = inst_mtype;
+    if (memory_)
+      effective = effective_mtype(inst_mtype, memory_->pte_mtype(addr, vmid));
     static thread_local uint64_t mtype_counts[5] = {};
     static thread_local uint64_t total = 0;
     ++mtype_counts[static_cast<int>(effective)];
@@ -84,31 +90,55 @@ void L1VectorCache::read_bytes(uint64_t addr, uint8_t *dst, uint32_t size, Mtype
     }
   });
 
+  const bool has_page_mtypes = memory_ && vmid != 0;
+  uint64_t cached_page = UINT64_MAX;
+  Mtype cached_mtype = inst_mtype;
+
+  if (!has_page_mtypes && !non_temporal && !request_l1_bypass &&
+      (inst_mtype == Mtype::RW || inst_mtype == Mtype::WB)) {
+    uint32_t copied = 0;
+    while (copied < size) {
+      const uint64_t ea = addr + copied;
+      const uint32_t line_offset = CacheStore::line_offset(ea);
+      const uint32_t chunk = std::min(size - copied, LINE_SIZE - line_offset);
+      const uint8_t *line = line_data_for_read(ea, vmid);
+      std::memcpy(dst + copied, line + line_offset, chunk);
+      copied += chunk;
+    }
+    return;
+  }
+
   uint32_t copied = 0;
   while (copied < size) {
     const uint64_t ea = addr + copied;
     const uint32_t line_offset = CacheStore::line_offset(ea);
     const uint32_t chunk = std::min(size - copied, LINE_SIZE - line_offset);
     Mtype chunk_mtype = inst_mtype;
-    if (memory_)
-      chunk_mtype = effective_mtype(inst_mtype, memory_->pte_mtype(ea, vmid));
+    if (has_page_mtypes) {
+      const uint64_t page = ea >> GpuMemory::PAGE_SHIFT;
+      if (page != cached_page) {
+        cached_page = page;
+        cached_mtype = effective_mtype(inst_mtype, memory_->pte_mtype(ea, vmid));
+      }
+      chunk_mtype = cached_mtype;
+    }
 
     if (chunk_mtype == Mtype::UC || non_temporal || request_l1_bypass) {
-      cache_.invalidate(ea, vmid);
+      invalidate(ea, vmid);
       l2_->read(ea, dst + copied, chunk, chunk_mtype, vmid);
       copied += chunk;
       continue;
     }
 
     if (chunk_mtype == Mtype::CC) {
-      cache_.invalidate(ea, vmid);
+      invalidate(ea, vmid);
       l2_->read(ea, dst + copied, chunk, chunk_mtype, vmid);
       copied += chunk;
       continue;
     }
 
-    ensure_line(ea, vmid);
-    cache_.read_line(ea, dst + copied, line_offset, chunk, vmid);
+    const uint8_t *line = line_data_for_read(ea, vmid);
+    std::memcpy(dst + copied, line + line_offset, chunk);
     copied += chunk;
   }
 }
@@ -116,11 +146,11 @@ void L1VectorCache::read_bytes(uint64_t addr, uint8_t *dst, uint32_t size, Mtype
 void L1VectorCache::write_bytes(uint64_t addr, const uint8_t *src, uint32_t size, Mtype mtype,
                                 bool non_temporal, uint32_t vmid) {
   Mtype inst_mtype = mtype;
-  Mtype effective = mtype;
-  if (memory_)
-    effective = effective_mtype(mtype, memory_->pte_mtype(addr, vmid));
 
   util::Logger::vm([&](auto &os) {
+    Mtype effective = inst_mtype;
+    if (memory_)
+      effective = effective_mtype(inst_mtype, memory_->pte_mtype(addr, vmid));
     if (addr >= 0x4d00c00000ULL && addr < 0x4d00c00100ULL) {
       uint32_t val = 0;
       if (size >= 4)
@@ -136,17 +166,27 @@ void L1VectorCache::write_bytes(uint64_t addr, const uint8_t *src, uint32_t size
     }
   });
 
+  const bool has_page_mtypes = memory_ && vmid != 0;
+  uint64_t cached_page = UINT64_MAX;
+  Mtype cached_mtype = inst_mtype;
+
   uint32_t copied = 0;
   while (copied < size) {
     const uint64_t ea = addr + copied;
     const uint32_t line_offset = CacheStore::line_offset(ea);
     const uint32_t chunk = std::min(size - copied, LINE_SIZE - line_offset);
     Mtype chunk_mtype = inst_mtype;
-    if (memory_)
-      chunk_mtype = effective_mtype(inst_mtype, memory_->pte_mtype(ea, vmid));
+    if (has_page_mtypes) {
+      const uint64_t page = ea >> GpuMemory::PAGE_SHIFT;
+      if (page != cached_page) {
+        cached_page = page;
+        cached_mtype = effective_mtype(inst_mtype, memory_->pte_mtype(ea, vmid));
+      }
+      chunk_mtype = cached_mtype;
+    }
 
     if (chunk_mtype == Mtype::UC || non_temporal) {
-      cache_.invalidate(ea, vmid);
+      invalidate(ea, vmid);
       l2_->write(ea, src + copied, chunk, chunk_mtype, vmid);
       copied += chunk;
       continue;
@@ -199,7 +239,7 @@ void L1VectorCache::store(const uint64_t *addrs, uint64_t lane_mask, uint32_t el
       });
 }
 
-void L1VectorCache::flush_all() { cache_.invalidate_all(); }
+void L1VectorCache::flush_all() { invalidate_all(); }
 
 } // namespace amdgpu
 } // namespace rocjitsu
