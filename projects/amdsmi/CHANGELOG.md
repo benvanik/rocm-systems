@@ -24,9 +24,31 @@ Full documentation for amd_smi_lib is available at [https://rocm.docs.amd.com/pr
   - When `--partition` is set with `--clock`: sources GFX/VCLK/DCLK/SOCCLK from partition metrics and adds per-AID and per-XCP clock entries with their limits.
   - When `--partition` is set with `--usage`: reports per-XCP GFX/JPEG/VCN activity.
 
-- **Added `--folder` support to `amd-smi ras --afid`**.  
-  - `amd-smi ras --afid --folder <DIR>` decodes every `*.cper` in a directory and prints a `file_name | list of afids` table (or a JSON array under `--json`).
-  - Records with no AFIDs show `-`; files that cannot be parsed show `decode failed`.
+- **Added `--folder` support to `amd-smi ras --afid`, and unified its output across human/JSON/CSV**.  
+  - `amd-smi ras --afid --folder <DIR>` decodes every `*.cper` in a directory; `amd-smi ras --afid --cper-file <FILE>` decodes a single record. Both paths render the same per-file schema.
+  - Human-readable output is a `file_name | list of afids` table. A file that fails to decode shows `[AMDSMI_STATUS_<name>] <message>` in place of its AFIDs:
+    ```
+    file_name      list of afids
+    empty.cper     [AMDSMI_STATUS_INVAL] Invalid CPER file input
+    garbage.cper   [AMDSMI_STATUS_UNEXPECTED_DATA] Unexpected data in the CPER file
+    ```
+  - JSON and CSV emit a structured per-file record with the fields `cper_file, afids, status, message, code` (`afids` is `N/A` when a file has no AFIDs or fails to decode):
+    ```
+    cper_file,afids,status,message,code
+    /tmp/cper/garbage.cper,N/A,AMDSMI_STATUS_UNEXPECTED_DATA,Unexpected data in the CPER file,43
+    ```
+    ```json
+    [
+        {
+            "cper_file": "/tmp/cper/garbage.cper",
+            "afids": "N/A",
+            "status": "AMDSMI_STATUS_UNEXPECTED_DATA",
+            "message": "Unexpected data in the CPER file",
+            "code": 43
+        }
+    ]
+    ```
+  - The command now exits with the underlying `AMDSMI_STATUS_*` (e.g. `43`), or `205` when files fail with differing codes. Previously decode failures in `--folder` silently exited `0`, `--csv` emitted the human table instead of CSV, and a failed `--json` record carried an ad-hoc `decode_status` object instead of the status fields above.
 
 - **Added IFoE/UALoE fabric telemetry and topology support**.  
   - New `amd-smi fabric` CLI subcommand with `--topology`/`-t` and `--info`/`-i` flags for querying fabric (UALoE) information.
@@ -107,6 +129,13 @@ Full documentation for amd_smi_lib is available at [https://rocm.docs.amd.com/pr
   | Unknown/unmapped library error | `100` | `255` (library `UNKNOWN_ERROR` folded to a byte) |
 
   The `Was`/`Now` values are process exit codes (`$?`). Previously the printed `code` field showed the *negative* of these (e.g. `-7`) while the process exited with the absolute value (`7`); the rework makes the printed `code` and `$?` agree (both `199`).
+
+- **Clearer, more consistent `amd-smi` error messages.**  
+  - Errors now read `[AMDSMI_STATUS_<name>] <message>`, so the underlying status is obvious at a glance. The internal class name is no longer prepended, and `--json`/`--csv` errors are now valid JSON/CSV.
+    - Before: `amdsmi_cli_exceptions.AmdSmiLibraryErrorException: AMDSMI has returned error '-1002' - 'Command not supported' Error code: -1002`
+    - After (human): `[AMDSMI_STATUS_NOT_SUPPORTED] Command not supported Error code: 2`
+    - After (`--json`): `{"error": "[AMDSMI_STATUS_NOT_SUPPORTED] Command not supported", "code": 2}`
+  - `amd-smi ras` no longer prints a Python traceback when a CPER file can't be read or decoded (`--afid --cper-file`, `--afid --folder`, `--cper`). It reports the failure and exits with the matching status code.
 
 - **`amd-smi set --power-cap` now applies per GPU instead of aborting on the first out-of-range device.**  
   - Each GPU is validated against its own reported range.
