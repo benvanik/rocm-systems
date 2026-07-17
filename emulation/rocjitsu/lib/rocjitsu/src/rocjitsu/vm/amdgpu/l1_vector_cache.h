@@ -22,6 +22,12 @@ class L2Cache;
 /// sharing the same L2 are properly merged at byte granularity.
 ///
 /// CDNA3 V$ geometry: 128B lines, 64 sets, 4-way = 32KB.
+///
+/// @par Thread safety
+/// This cache is mutable per-CU state and is not internally synchronized.
+/// Functional dispatch must preserve one-host-thread-per-CU ownership while a
+/// CU quantum runs. Different CUs may execute concurrently because each owns a
+/// separate L1VectorCache; their shared L2 provides its own synchronization.
 class L1VectorCache {
 public:
   static constexpr uint32_t LINE_SIZE_BITS = 7; // 128 bytes
@@ -43,15 +49,8 @@ public:
              const uint8_t *src, Mtype mtype, bool non_temporal, uint32_t wf_size,
              uint32_t vmid = 0);
 
-  void invalidate(uint64_t addr, uint32_t vmid = 0) {
-    cache_.invalidate(addr, vmid);
-    if (cached_read_line_addr_ == CacheStore::line_address(addr) && cached_read_line_vmid_ == vmid)
-      clear_cached_read_line();
-  }
-  void invalidate_all() {
-    cache_.invalidate_all();
-    clear_cached_read_line();
-  }
+  void invalidate(uint64_t addr, uint32_t vmid = 0) { cache_.invalidate(addr, vmid); }
+  void invalidate_all() { cache_.invalidate_all(); }
   void flush_all();
 
   uint64_t store_count() const { return store_count_; }
@@ -67,32 +66,13 @@ private:
   void ensure_line(uint64_t addr, uint32_t vmid);
   const uint8_t *fetch_line(uint64_t addr, uint32_t vmid);
   const uint8_t *line_data_for_read(uint64_t addr, uint32_t vmid) {
-    const uint64_t line_addr = CacheStore::line_address(addr);
-    if (cached_read_line_data_ && cached_read_line_addr_ == line_addr &&
-        cached_read_line_vmid_ == vmid)
-      return cached_read_line_data_;
-
     const uint8_t *line = cache_.line_data_for_read(addr, vmid);
-    if (!line)
-      return fetch_line(addr, vmid);
-
-    cached_read_line_addr_ = line_addr;
-    cached_read_line_vmid_ = vmid;
-    cached_read_line_data_ = line;
-    return line;
-  }
-  void clear_cached_read_line() {
-    cached_read_line_addr_ = UINT64_MAX;
-    cached_read_line_vmid_ = 0;
-    cached_read_line_data_ = nullptr;
+    return line ? line : fetch_line(addr, vmid);
   }
 
   CacheStore cache_;
   L2Cache *l2_;
   GpuMemory *memory_ = nullptr;
-  uint64_t cached_read_line_addr_ = UINT64_MAX;
-  uint32_t cached_read_line_vmid_ = 0;
-  const uint8_t *cached_read_line_data_ = nullptr;
   uint64_t store_count_ = 0;
   uint64_t store_active_count_ = 0;
   uint64_t store_l2_writes_ = 0;

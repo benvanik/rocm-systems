@@ -12,6 +12,7 @@
 #include <cassert>
 #include <cstring>
 #include <format>
+#include <limits>
 
 namespace rocjitsu {
 namespace amdgpu {
@@ -59,9 +60,6 @@ const uint8_t *L1VectorCache::fetch_line(uint64_t addr, uint32_t vmid) {
   assert(!evicted.dirty && "L1 V$ is write-through; lines should never be dirty");
 
   l2_->fetch_line(line_addr, allocated.data, vmid);
-  cached_read_line_addr_ = line_addr;
-  cached_read_line_vmid_ = vmid;
-  cached_read_line_data_ = allocated.data;
   return allocated.data;
 }
 
@@ -91,7 +89,7 @@ void L1VectorCache::read_bytes(uint64_t addr, uint8_t *dst, uint32_t size, Mtype
   });
 
   const bool has_page_mtypes = memory_ && vmid != 0;
-  uint64_t cached_page = UINT64_MAX;
+  uint64_t cached_page = std::numeric_limits<uint64_t>::max();
   Mtype cached_mtype = inst_mtype;
 
   if (!has_page_mtypes && !non_temporal && !request_l1_bypass &&
@@ -167,7 +165,7 @@ void L1VectorCache::write_bytes(uint64_t addr, const uint8_t *src, uint32_t size
   });
 
   const bool has_page_mtypes = memory_ && vmid != 0;
-  uint64_t cached_page = UINT64_MAX;
+  uint64_t cached_page = std::numeric_limits<uint64_t>::max();
   Mtype cached_mtype = inst_mtype;
 
   uint32_t copied = 0;

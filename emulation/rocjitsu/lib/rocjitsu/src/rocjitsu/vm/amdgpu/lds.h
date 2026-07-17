@@ -21,6 +21,12 @@ namespace amdgpu {
 /// RDNA WGP-mode workgroups use a backing owned by the sibling-CU pair. The
 /// latter has the combined capacity of both physical CUs. Addresses are
 /// byte-granularity and local to the selected placement (not globally visible).
+///
+/// @par Thread safety
+/// LDS is placement-owned mutable state and is not internally synchronized.
+/// Functional dispatch must keep a CU, or an RDNA sibling-CU WGP pair, confined
+/// to one host worker while its quantum executes. Distinct placements own
+/// distinct Lds instances and may execute concurrently.
 class Lds : public simdojo::MemoryInterface {
 public:
   /// @brief Construct LDS with the given size in kilobytes.

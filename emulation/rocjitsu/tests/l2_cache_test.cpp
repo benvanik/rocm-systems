@@ -68,6 +68,42 @@ TEST(L2CacheThreadingTest, ConcurrentDifferentSetWritesArePreserved) {
   }
 }
 
+TEST(L2CacheThreadingTest, ConcurrentSameSetAccessesPreserveLines) {
+  GpuMemory memory("memory");
+  L2Cache l2("l2");
+  l2.set_backing_memory(&memory);
+
+  constexpr uint32_t kThreads = 8;
+  constexpr uint32_t kIterations = 256;
+  constexpr uint64_t kBase = 0x180000;
+  constexpr uint64_t kSetStride = static_cast<uint64_t>(L2Cache::NUM_SETS) * L2Cache::LINE_SIZE;
+
+  std::barrier start(kThreads);
+  std::atomic<uint64_t> mismatches{0};
+  std::vector<std::thread> workers;
+  workers.reserve(kThreads);
+  for (uint32_t tid = 0; tid < kThreads; ++tid) {
+    workers.emplace_back([&, tid] {
+      const uint64_t addr = kBase + tid * kSetStride;
+      std::array<uint8_t, L2Cache::LINE_SIZE> line{};
+      std::array<uint8_t, L2Cache::LINE_SIZE> actual{};
+      start.arrive_and_wait();
+      for (uint32_t iteration = 0; iteration < kIterations; ++iteration) {
+        line.fill(static_cast<uint8_t>((tid << 4) ^ iteration));
+        l2.write(addr, line.data(), line.size());
+        l2.read(addr, actual.data(), actual.size());
+        if (actual != line)
+          mismatches.fetch_add(1, std::memory_order_relaxed);
+      }
+    });
+  }
+
+  for (auto &worker : workers)
+    worker.join();
+
+  EXPECT_EQ(mismatches.load(std::memory_order_relaxed), 0u);
+}
+
 TEST(L2CacheThreadingTest, ConcurrentAtomicRmwSameLineIsSerialized) {
   GpuMemory memory("memory");
   L2Cache l2("l2");
@@ -269,6 +305,35 @@ TEST(L1VectorCacheTest, CoalescesContiguousLaneLoads) {
 
   EXPECT_EQ(l1.read_count(), 1u);
   EXPECT_TRUE(std::equal(input.begin(), input.end(), output.begin()));
+}
+
+TEST(L1VectorCacheTest, SameSetEvictionNeverAliasesPreviousLine) {
+  GpuMemory memory("memory");
+  L2Cache l2("l2");
+  l2.set_backing_memory(&memory);
+  L1VectorCache l1(&l2);
+  l1.set_memory(&memory);
+
+  constexpr uint64_t kBase = 0x4c0000;
+  constexpr uint64_t kSetStride =
+      static_cast<uint64_t>(L1VectorCache::NUM_SETS) * L1VectorCache::LINE_SIZE;
+  std::array<uint64_t, 64> addrs{};
+  std::array<uint8_t, 64> output{};
+
+  auto load_byte = [&](uint64_t addr) {
+    addrs[0] = addr;
+    l1.load(addrs.data(), 1, 1, 1, output.data(), Mtype::RW, false, false,
+            /*wf_size=*/64);
+    return output[0];
+  };
+
+  for (uint32_t way = 0; way <= L1VectorCache::ASSOCIATIVITY; ++way)
+    memory.write8(kBase + way * kSetStride, static_cast<uint8_t>(0x40 + way));
+
+  EXPECT_EQ(load_byte(kBase), 0x40);
+  for (uint32_t way = 1; way <= L1VectorCache::ASSOCIATIVITY; ++way)
+    EXPECT_EQ(load_byte(kBase + way * kSetStride), 0x40 + way);
+  EXPECT_EQ(load_byte(kBase), 0x40);
 }
 
 TEST(L1VectorCacheTest, MaskGapsBreakContiguousLaneStoreRuns) {
