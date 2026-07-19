@@ -953,7 +953,7 @@ TEST(Gfx1250DecodeTest, FlatVaddrWidthFollowsSaddrMode) {
   };
   // The same instruction with SADDR disabled uses a 64-bit vector address.
   const uint32_t vector_only_words[] = {
-      0xEC05407Fu,
+      0xEC05407Cu,
       0x00000002u,
       0x00000001u,
   };
@@ -985,7 +985,7 @@ TEST(Gfx1250DecodeTest, GlobalVaddrWidthFollowsSaddrMode) {
   };
   // The same instruction with SADDR disabled uses a 64-bit vector address.
   const uint32_t vector_only_words[] = {
-      0xEE05407Fu,
+      0xEE05407Cu,
       0x00000002u,
       0x0000000Au,
   };
@@ -1025,6 +1025,8 @@ TEST(Gfx1250DecodeTest, GlobalStoreUsesScalarOffsetVaddrWidth) {
   InstDefUse def_use(*inst);
   EXPECT_TRUE(def_use.uses.contains({RegClass::VGPR, 10, 1}));
   EXPECT_FALSE(def_use.uses.contains({RegClass::VGPR, 10, 2}));
+}
+
 TEST(Rdna4DecodeTest, VopdXyConsumesThreeDwords) {
   const uint32_t words[] = {
       0xCA240080u, // v_dual_mov_b32 v5, 0 :: v_dual_and_b32 v4, 0x3ff, v31
