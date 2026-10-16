@@ -721,6 +721,7 @@ add_executable(
     util_distributed_shared_mutex_test.cpp
     util_observable_shared_mutex_test.cpp
     host_mapping_lock_test.cpp
+    host_access_guard_test.cpp
     util_result_test.cpp
     util_unique_handle_test.cpp
     util_simd_test.cpp

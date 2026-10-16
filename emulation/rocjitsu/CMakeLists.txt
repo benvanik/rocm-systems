@@ -81,6 +81,16 @@ option(
 )
 option(RJ_INSTALL_TESTS "Install rocjitsu test binaries" OFF)
 option(
+    ROCJITSU_ENABLE_INTERPOSER
+    "Include the Linux LD_PRELOAD interposer in librocjitsu"
+    ON
+)
+option(
+    RJ_ENABLE_HOST_FAULT_RECOVERY
+    "Recover invalid host memory accesses using SIGSEGV and SIGBUS handlers"
+    ON
+)
+option(
     ROCJITSU_ENABLE_PERFSIM_PLUGIN
     "Build the optional RocJITsu adapter for an external Perfsim observer plugin"
     OFF
@@ -331,6 +341,10 @@ set(FLATBUFFERS_BUILD_FLATLIB ON CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(googletest flatbuffers)
 
+if(NOT RJ_ENABLE_HOST_FAULT_RECOVERY)
+    add_compile_definitions(RJ_DISABLE_HOST_FAULT_RECOVERY)
+endif()
+
 include(rj_flatbuffers)
 
 # Set include paths before adding subdirectories so all targets can find them.
@@ -395,7 +409,7 @@ target_include_directories(
 target_include_directories(rocjitsu_shared SYSTEM PRIVATE ${HSA_INCLUDE_DIR})
 
 # Linux-only: KMD interposer (LD_PRELOAD shim) and its dependencies.
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND ROCJITSU_ENABLE_INTERPOSER)
     target_sources(
         rocjitsu_shared
         PRIVATE ${ROCJITSU_SRC_DIR}/rocjitsu/kmd/linux/interposer.cpp

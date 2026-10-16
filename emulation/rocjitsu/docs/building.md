@@ -33,6 +33,27 @@ cmake --build build
 | `RJ_CLANG_TIDY` | `OFF` | Enable clang-tidy static analysis |
 | `LTO` | `OFF` | Enable link-time optimization for Release/RelWithDebInfo |
 | `ROCJITSU_ENABLE_VFIO` | `OFF` | Build Linux VFIO-user support; requires CMake 3.28+ and Linux 6.1+ UAPI headers |
+| `ROCJITSU_ENABLE_INTERPOSER` | `ON` | Include the Linux LD_PRELOAD interposer in `librocjitsu` |
+| `RJ_ENABLE_HOST_FAULT_RECOVERY` | `ON` | Install SIGSEGV/SIGBUS handlers to recover faulting host memory accesses |
+
+### Explicit C API embedding
+
+Applications that load `librocjitsu` and drive its `rj_vm_*` API directly can
+exclude the libc interposer and preserve their own signal handlers:
+
+```bash
+cmake -B build -G Ninja -DROCJITSU_ENABLE_INTERPOSER=OFF \
+  -DRJ_ENABLE_HOST_FAULT_RECOVERY=OFF
+cmake --build build --target rocjitsu_shared
+```
+
+With host fault recovery disabled, host memory accesses execute directly.
+Faults follow the host process's signal disposition and can terminate it;
+rocjitsu does not convert them into simulated GPU memory exceptions. The
+application must keep backing memory accessible throughout simulated accesses.
+Tests that intentionally revoke host mappings require a recovery-enabled build.
+The interposer option controls libc interception independently of fault recovery.
+The LD_PRELOAD workflow requires the interposer-enabled library.
 
 ### Host CPU baseline
 
