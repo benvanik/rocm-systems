@@ -130,52 +130,65 @@ function(
     endif()
 
     foreach(_sanitizer IN LISTS RJ_SANI_LIB_SANITIZERS)
-        set(_runtime_name)
+        set(_runtime_names)
         if(RJ_SANI_LIB_COMPILER_ID STREQUAL "GNU")
             if(_sanitizer STREQUAL "address")
-                set(_runtime_name "libasan.so")
+                set(_runtime_names "libasan.so")
             elseif(_sanitizer STREQUAL "undefined")
-                set(_runtime_name "libubsan.so")
+                set(_runtime_names "libubsan.so")
             elseif(_sanitizer STREQUAL "thread")
-                set(_runtime_name "libtsan.so")
+                set(_runtime_names "libtsan.so")
             endif()
         elseif(RJ_SANI_LIB_COMPILER_ID MATCHES "Clang")
             if(_sanitizer STREQUAL "address")
-                set(_runtime_name "libclang_rt.asan-${_sanitizer_arch}.so")
+                set(_runtime_base "asan")
             elseif(_sanitizer STREQUAL "undefined")
-                set(_runtime_name
-                    "libclang_rt.ubsan_standalone-${_sanitizer_arch}.so"
-                )
+                set(_runtime_base "ubsan_standalone")
             elseif(_sanitizer STREQUAL "thread")
-                set(_runtime_name "libclang_rt.tsan-${_sanitizer_arch}.so")
+                set(_runtime_base "tsan")
             endif()
+            # Per-target runtime directories use an unsuffixed library name;
+            # older compiler-rt layouts encode the architecture in the name.
+            if(_runtime_base)
+                set(_runtime_names
+                    "libclang_rt.${_runtime_base}.so"
+                    "libclang_rt.${_runtime_base}-${_sanitizer_arch}.so"
+                )
+            endif()
+            unset(_runtime_base)
         endif()
 
-        if(NOT _runtime_name)
+        if(NOT _runtime_names)
             continue()
         endif()
 
-        execute_process(
-            COMMAND ${_compiler_command} --print-file-name=${_runtime_name}
-            RESULT_VARIABLE _runtime_result
-            OUTPUT_VARIABLE _runtime_output
-            ERROR_QUIET
-            OUTPUT_STRIP_TRAILING_WHITESPACE
-        )
         set(_runtime_library "")
-        if(
-            _runtime_result EQUAL 0
-            AND IS_ABSOLUTE "${_runtime_output}"
-            AND EXISTS "${_runtime_output}"
-        )
-            set(_runtime_library "${_runtime_output}")
-        endif()
+        foreach(_runtime_name IN LISTS _runtime_names)
+            execute_process(
+                COMMAND ${_compiler_command} --print-file-name=${_runtime_name}
+                RESULT_VARIABLE _runtime_result
+                OUTPUT_VARIABLE _runtime_output
+                ERROR_QUIET
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+            )
+            if(
+                _runtime_result EQUAL 0
+                AND IS_ABSOLUTE "${_runtime_output}"
+                AND EXISTS "${_runtime_output}"
+            )
+                set(_runtime_library "${_runtime_output}")
+                break()
+            endif()
+        endforeach()
 
         if(
             NOT _runtime_library
             AND _resource_dir_result EQUAL 0
             AND IS_DIRECTORY "${_resource_dir}"
         )
+            # Only search other runtime directories for the architecture-named
+            # form. An unsuffixed library there could target a different CPU.
+            list(GET _runtime_names -1 _runtime_name)
             file(
                 GLOB _runtime_candidates
                 "${_resource_dir}/lib/*/${_runtime_name}"
@@ -191,7 +204,7 @@ function(
                 FATAL_ERROR
                 "RJ_SANITIZER_RUNTIME=SHARED requires the ${_sanitizer} "
                 "sanitizer shared runtime, but CMake could not locate "
-                "${_runtime_name} with ${RJ_SANI_LIB_COMPILER}."
+                "${_runtime_names} with ${RJ_SANI_LIB_COMPILER}."
             )
         endif()
 
