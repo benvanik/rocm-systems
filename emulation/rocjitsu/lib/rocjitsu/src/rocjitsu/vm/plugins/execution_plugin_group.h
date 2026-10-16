@@ -454,6 +454,12 @@ public:
   }
 
   static std::shared_ptr<ExecutionPluginGroup> empty_group() {
+#if defined(RJ_DISABLE_INTERPOSER)
+    // Explicit hosts join engine workers before destroying their VMs and
+    // unloading the library. The default group can share that library lifetime.
+    static auto instance = std::make_shared<ExecutionPluginGroup>(PluginSinkConfig{});
+    return instance;
+#else
     // Immortal singleton: the shared_ptr is heap-allocated and deliberately never
     // deleted, so its control block outlives process teardown. In local-mode
     // (LD_PRELOAD interposer) the simulation engine runs on a detached thread that
@@ -470,6 +476,7 @@ public:
         new std::shared_ptr<ExecutionPluginGroup>(
             std::make_shared<ExecutionPluginGroup>(PluginSinkConfig{}));
     return *instance;
+#endif
   }
 
 private:

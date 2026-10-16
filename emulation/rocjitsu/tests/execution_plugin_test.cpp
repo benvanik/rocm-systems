@@ -3459,6 +3459,7 @@ TEST(ExecutionPluginTest, SerialHotHookOptInPreventsInfrequentAndHighFrequencyOv
 
 TEST(ExecutionPluginTest, EmptyGroupDispatchBypassesCallbackLock) {
   auto group = ExecutionPluginGroup::empty_group();
+  EXPECT_EQ(group, ExecutionPluginGroup::empty_group());
   ASSERT_TRUE(group->empty());
   const uint64_t before = test::ExecutionPluginGroupTestAccess::callback_lock_acquisitions(*group);
 

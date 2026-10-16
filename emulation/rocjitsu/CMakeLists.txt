@@ -341,6 +341,10 @@ set(FLATBUFFERS_BUILD_FLATLIB ON CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(googletest flatbuffers)
 
+if(NOT ROCJITSU_ENABLE_INTERPOSER)
+    add_compile_definitions(RJ_DISABLE_INTERPOSER)
+endif()
+
 if(NOT RJ_ENABLE_HOST_FAULT_RECOVERY)
     add_compile_definitions(RJ_DISABLE_HOST_FAULT_RECOVERY)
 endif()
