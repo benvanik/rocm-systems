@@ -954,6 +954,27 @@ ExecutionThreadSettings execution_thread_settings(const fb::SimulationConfig *co
   return settings;
 }
 
+DeviceIdentityConfig device_identity_from_fb(const fb::SimulationConfig *config) {
+  DeviceIdentityConfig identity;
+  if (config->vm() == nullptr || config->vm()->gpu() == nullptr)
+    return identity;
+  const auto *gpu = config->vm()->gpu();
+  identity.device = kfd_device_from_fb(gpu->device(), "vm.gpu.device");
+  if (identity.device.present) {
+    (void)resolve_gpu_generation_topology(identity.device);
+    identity.num_gpus = std::max(1u, gpu->num_gpus());
+    const uint32_t last_index = identity.num_gpus - 1;
+    if (last_index > std::numeric_limits<uint32_t>::max() - identity.device.gpu_id ||
+        last_index > std::numeric_limits<uint64_t>::max() - identity.device.unique_id ||
+        last_index > (std::numeric_limits<uint16_t>::max() - 0x0300u) / 256u)
+      throw std::invalid_argument("Replicated GPU identity exceeds its native range");
+  }
+  identity.pci = pci_device_from_fb(gpu->pci());
+  if (config->topology())
+    identity.num_xcc = execution_topology(config->topology()->root()).xcds;
+  return identity;
+}
+
 LoadedConfig build_from_fb(const rocjitsu::fb::SimulationConfig *fb_config, uint32_t host_threads) {
   CfgMap cu_overrides;
   if (const auto *setting = fb_config->wait_checking()) {
@@ -1004,10 +1025,8 @@ LoadedConfig build_from_fb(const rocjitsu::fb::SimulationConfig *fb_config, uint
 
   // Extract KFD device identity before topology construction so target/version
   // mismatches fail before any simulator components are exposed.
-  if (fb_config->vm()->gpu() && fb_config->vm()->gpu()->device())
-    result.device = kfd_device_from_fb(fb_config->vm()->gpu()->device(), "vm.gpu.device");
-  if (result.device.present)
-    (void)resolve_gpu_generation_topology(result.device);
+  const auto identity = device_identity_from_fb(fb_config);
+  result.device = identity.device;
   if (target != nullptr && target->gfx_target_version != 0 && result.device.present &&
       result.device.gfx_target_version != 0 &&
       result.device.gfx_target_version != target->gfx_target_version)
@@ -1021,8 +1040,7 @@ LoadedConfig build_from_fb(const rocjitsu::fb::SimulationConfig *fb_config, uint
   if (!topo_def)
     throw std::runtime_error("Config missing 'topology' section");
 
-  if (fb_config->vm()->gpu())
-    result.num_gpus = std::max(1u, fb_config->vm()->gpu()->num_gpus());
+  result.num_gpus = std::max(1u, identity.num_gpus);
   const auto thread_settings = execution_thread_settings(fb_config);
   result.thread_allocations = thread_settings.choices;
   result.execution_threads = thread_settings.resolve(host_threads);
@@ -1040,20 +1058,14 @@ LoadedConfig build_from_fb(const rocjitsu::fb::SimulationConfig *fb_config, uint
 
   // A config that describes no bus still yields usable defaults, so front ends
   // that attach the GPU to a VMM work without every config being updated.
-  if (fb_config->vm() && fb_config->vm()->gpu()) {
-    result.pci = pci_device_from_fb(fb_config->vm()->gpu()->pci());
-  }
+  result.pci = identity.pci;
 
   result.dbt_guest = dbt_guest_from_fb(fb_config->dbt_guest());
 
   if (result.num_gpus > 1 && result.device.present) {
     result.devices.resize(result.num_gpus);
     for (uint32_t i = 0; i < result.num_gpus; ++i) {
-      result.devices[i] = result.device;
-      result.devices[i].gpu_id = result.device.gpu_id + i;
-      result.devices[i].location_id = 0x0300 + (i << 8);
-      result.devices[i].drm_render_minor = 128 + i;
-      result.devices[i].unique_id = result.device.unique_id + i;
+      result.devices[i] = device_identity_at(identity, i);
     }
     for (uint32_t i = 1; i < result.num_gpus; ++i) {
       result.extra_gpu_builds.push_back(build_topology(
@@ -1137,19 +1149,23 @@ const char *arch_to_string(rj_code_arch_t arch) {
 
 DeviceIdentityConfig load_device_identity(const std::string &json_path,
                                           const std::string &schema_text) {
-  const std::string json = read_config_file(json_path);
-  return with_parsed_simulation_config_json(
-      json, schema_text, [](const fb::SimulationConfig *config) {
-        DeviceIdentityConfig identity;
-        if (config->vm() == nullptr || config->vm()->gpu() == nullptr) {
-          return identity;
-        }
-        identity.device = kfd_device_from_fb(config->vm()->gpu()->device(), "vm.gpu.device");
-        if (identity.device.present)
-          (void)resolve_gpu_generation_topology(identity.device);
-        identity.pci = pci_device_from_fb(config->vm()->gpu()->pci());
-        return identity;
-      });
+  return load_device_identity_from_string(read_config_file(json_path), schema_text);
+}
+
+DeviceIdentityConfig load_device_identity_from_string(const std::string &json,
+                                                      const std::string &schema_text) {
+  return with_parsed_simulation_config_json(json, schema_text, device_identity_from_fb);
+}
+
+KfdDeviceConfig device_identity_at(const DeviceIdentityConfig &identity, uint32_t index) {
+  auto device = identity.device;
+  if (identity.num_gpus > 1) {
+    device.gpu_id += index;
+    device.location_id = 0x0300 + (index << 8);
+    device.drm_render_minor = 128 + index;
+    device.unique_id += index;
+  }
+  return device;
 }
 
 ExecutionThreadSettings load_execution_thread_settings(const std::string &json_path,

@@ -250,6 +250,8 @@ struct LoadedConfig {
 struct DeviceIdentityConfig {
   KfdDeviceConfig device; ///< GPU identity, as KFD also reports it.
   PciDeviceConfig pci;    ///< Bus shape for PCI-attached front ends.
+  uint32_t num_gpus = 0;  ///< Number of GPU identities described by this config.
+  uint32_t num_xcc = 0;   ///< XCD components per GPU, counted without constructing them.
 };
 
 /// @brief Read only a config's device identity and bus shape.
@@ -262,6 +264,14 @@ struct DeviceIdentityConfig {
 /// to know which GPU to present should not pay for a machine it never runs.
 DeviceIdentityConfig load_device_identity(const std::string &json_path,
                                           const std::string &schema_text);
+
+/// @brief Read device identity and bus shape from an in-memory JSON snapshot.
+DeviceIdentityConfig load_device_identity_from_string(const std::string &json,
+                                                      const std::string &schema_text);
+
+/// @brief Select a configured GPU identity using the VM's replication rules.
+/// @details The caller supplies an index less than identity.num_gpus.
+KfdDeviceConfig device_identity_at(const DeviceIdentityConfig &identity, uint32_t index);
 
 /// @brief Parse an architecture name string to an rj_code_arch_t enum value.
 rj_code_arch_t parse_arch(const std::string &arch_str);
