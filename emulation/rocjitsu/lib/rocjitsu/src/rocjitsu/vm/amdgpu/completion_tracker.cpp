@@ -67,6 +67,7 @@ CompletionTracker::drain_completions(std::vector<ComputeQueueRecord> &queues) {
     const bool idle_publication_cancelable =
         qs.idle_publication.phase == QueueIdlePublicationPhase::CaptureAccess ||
         qs.idle_publication.phase == QueueIdlePublicationPhase::ReadSignalHandle ||
+        qs.idle_publication.phase == QueueIdlePublicationPhase::ReadMailboxPointer ||
         qs.idle_publication.phase == QueueIdlePublicationPhase::StoreIdleStatus;
     if (idle_generation_stale && idle_publication_cancelable) {
       // Before the status CAS commits, new work invalidates the prior empty
@@ -277,7 +278,7 @@ CompletionTracker::advance_queue_idle_publication(QueueIdlePublicationState &sta
       }
       if ((state.signal_address & 0x3f) != 0)
         return VmAccessOutcome::Malformed;
-      state.phase = QueueIdlePublicationPhase::StoreIdleStatus;
+      state.phase = QueueIdlePublicationPhase::ReadMailboxPointer;
       continue;
     }
 
@@ -289,7 +290,7 @@ CompletionTracker::advance_queue_idle_publication(QueueIdlePublicationState &sta
                                sizeof(uint64_t), 0, kIdleStatus);
       if (idle.outcome != VmAccessOutcome::Complete)
         return idle.outcome;
-      state.phase = QueueIdlePublicationPhase::ReadMailboxPointer;
+      state.phase = QueueIdlePublicationPhase::ReadEventId;
       continue;
     }
 
@@ -299,7 +300,11 @@ CompletionTracker::advance_queue_idle_publication(QueueIdlePublicationState &sta
                    &state.mailbox_pointer, sizeof(state.mailbox_pointer));
       if (outcome != VmAccessOutcome::Complete)
         return outcome;
-      state.phase = QueueIdlePublicationPhase::ReadEventId;
+      // Idle wakeups serve the runtime's interrupt-backed queue handler. A
+      // polled inactive signal reports scratch requests and errors; draining
+      // an otherwise healthy queue must leave that signal unchanged.
+      state.phase = state.mailbox_pointer == 0 ? QueueIdlePublicationPhase::DeliverGenericInterrupt
+                                               : QueueIdlePublicationPhase::StoreIdleStatus;
       continue;
     }
 

@@ -370,6 +370,34 @@ TEST(CompletionTrackerTest, ReportsTerminalPublicationFaultWithoutRetiringEntry)
   EXPECT_EQ(fixture.interrupts, 0u);
 }
 
+TEST(CompletionTrackerTest, QueueIdlePreservesPolledInactiveSignal) {
+  constexpr uint64_t kQueueDescriptor = 0x500;
+  constexpr uint64_t kIdleSignal = 0x200;
+
+  for (const uint64_t value : {uint64_t{0}, uint64_t{1}, uint64_t{0x8000000000000000}}) {
+    SCOPED_TRACE(value);
+    CompletionFixture fixture;
+    auto &queue = fixture.queues.front();
+    queue.fanout_replica = false;
+    queue.address_space = fixture.address_space;
+    queue.interrupt_sink = fixture.subscription.sink();
+    queue.queue_desc_va = kQueueDescriptor;
+    queue.entries.front().completion_signal = 0;
+    fixture.memory->store(kQueueDescriptor + offsetof(amd_queue_t, queue_inactive_signal),
+                          kIdleSignal);
+    fixture.memory->store(kIdleSignal + CompletionFixture::kValueOffset, value);
+
+    const CompletionDrainResult result = fixture.tracker.drain_completions(fixture.queues);
+    EXPECT_FALSE(result.retry_pending);
+    EXPECT_FALSE(result.terminal_fault);
+    EXPECT_TRUE(fixture.tracker.all_complete(fixture.queues));
+    EXPECT_EQ(fixture.retired, 1u);
+    EXPECT_EQ(fixture.memory->load<uint64_t>(kIdleSignal + CompletionFixture::kValueOffset), value);
+    EXPECT_EQ(fixture.memory->successful_compare_exchanges(), 0u);
+    EXPECT_EQ(fixture.interrupts, 1u);
+  }
+}
+
 TEST(CompletionTrackerTest, QueueIdlePublicationSurvivesUnavailableMailboxStore) {
   constexpr uint64_t kQueueDescriptor = 0x500;
   constexpr uint64_t kIdleSignal = 0x200;
