@@ -8,7 +8,6 @@
 #include "rocjitsu/vm/gpu_info.h"
 #include "util/log.h"
 
-#include <algorithm>
 #include <memory>
 #include <new>
 #include <string>
@@ -57,19 +56,6 @@ rj_status_t rj_vm_config_gpu_info(const rj_vm_config_t *config, uint32_t index,
   if (!config || !info || index >= config->devices.size())
     return ROCJITSU_STATUS_INVALID_ARGUMENT;
   *info = rocjitsu::gpu_info_to_c(config->devices[index]);
-  return ROCJITSU_STATUS_SUCCESS;
-}
-
-rj_status_t rj_vm_config_gpu_ip_version(const rj_vm_config_t *config, uint32_t index,
-                                        uint32_t hardware_id, rj_vm_ip_version_t *version) {
-  if (!config || !version || index >= config->devices.size())
-    return ROCJITSU_STATUS_INVALID_ARGUMENT;
-  const auto &versions = config->devices[index].ip_versions;
-  const auto found =
-      std::ranges::find(versions, hardware_id, &rocjitsu::config::DeviceIpVersion::hardware_id);
-  if (found == versions.end())
-    return ROCJITSU_STATUS_UNSUPPORTED;
-  *version = {found->major, found->minor, found->revision};
   return ROCJITSU_STATUS_SUCCESS;
 }
 

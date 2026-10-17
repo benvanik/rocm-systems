@@ -19,13 +19,6 @@ extern "C" {
 /// the handle and every VM created from it have been destroyed.
 typedef struct rj_vm_config_t rj_vm_config_t;
 
-/// @brief Exact version of one configured hardware IP block.
-typedef struct rj_vm_ip_version_t {
-  uint32_t major;    ///< Hardware IP major version.
-  uint32_t minor;    ///< Hardware IP minor version.
-  uint32_t revision; ///< Hardware IP revision, independent of compiler target spelling.
-} rj_vm_ip_version_t;
-
 /// @brief Copy JSON and discover its configured GPUs without activating them.
 /// @details Parses metadata without constructing simulator components, creating
 /// workers, opening a simulated process, or generating sysfs files. Full VM
@@ -47,14 +40,6 @@ RJ_API_EXPORT rj_status_t rj_vm_config_gpu_count(const rj_vm_config_t *config, u
 /// leaves @p info unchanged and returns ROCJITSU_STATUS_INVALID_ARGUMENT.
 RJ_API_EXPORT rj_status_t rj_vm_config_gpu_info(const rj_vm_config_t *config, uint32_t index,
                                                 rj_vm_gpu_info_t *info);
-
-/// @brief Query an exact hardware IP version by its discovery hardware ID.
-/// @details For example, hardware ID 11 selects GC and 42 selects SDMA0.
-/// Missing IP metadata returns ROCJITSU_STATUS_UNSUPPORTED. Every failure
-/// leaves @p version unchanged. This query performs no allocation or activation.
-RJ_API_EXPORT rj_status_t rj_vm_config_gpu_ip_version(const rj_vm_config_t *config, uint32_t index,
-                                                      uint32_t hardware_id,
-                                                      rj_vm_ip_version_t *version);
 
 /// @brief Create a VM from the configuration's retained JSON snapshot.
 /// @details The VM owns its construction state independently of @p config;

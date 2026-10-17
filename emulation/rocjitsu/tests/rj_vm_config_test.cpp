@@ -11,7 +11,6 @@
 #include <iterator>
 #include <memory>
 #include <string>
-#include <utility>
 
 namespace {
 
@@ -31,11 +30,9 @@ std::string read_config(const char *name, uint32_t count = 1) {
 }
 
 struct ConfigCase {
-  const char *file;        ///< Canonical config source.
-  uint32_t gpu_id;         ///< Base KFD GPU identity.
-  uint32_t gfx;            ///< Compiler target identity.
-  rj_vm_ip_version_t gc;   ///< Exact graphics/compute IP identity.
-  rj_vm_ip_version_t sdma; ///< Exact SDMA0 IP identity.
+  const char *file; ///< Canonical config source.
+  uint32_t gpu_id;  ///< Base KFD GPU identity.
+  uint32_t gfx;     ///< Compiler target identity.
 };
 
 class VmConfigTest : public testing::TestWithParam<ConfigCase> {};
@@ -62,15 +59,6 @@ TEST_P(VmConfigTest, EnumeratesIndependentGpuIdentitiesWithoutAVm) {
     if (index == 0)
       first_unique_id = info.unique_id;
     EXPECT_EQ(info.unique_id, first_unique_id + index);
-    for (const auto &[hardware_id, expected] :
-         {std::pair{11u, GetParam().gc}, std::pair{42u, GetParam().sdma}}) {
-      rj_vm_ip_version_t version{};
-      ASSERT_EQ(rj_vm_config_gpu_ip_version(config.get(), index, hardware_id, &version),
-                ROCJITSU_STATUS_SUCCESS);
-      EXPECT_EQ(version.major, expected.major);
-      EXPECT_EQ(version.minor, expected.minor);
-      EXPECT_EQ(version.revision, expected.revision);
-    }
   }
 }
 
@@ -118,15 +106,6 @@ TEST_P(VmConfigTest, FailedQueriesPreserveOutputs) {
   EXPECT_EQ(rj_vm_config_gpu_info(nullptr, 0, &info), ROCJITSU_STATUS_INVALID_ARGUMENT);
   EXPECT_EQ(std::memcmp(&before, &info, sizeof(info)), 0);
   EXPECT_EQ(rj_vm_config_gpu_info(config.get(), 0, nullptr), ROCJITSU_STATUS_INVALID_ARGUMENT);
-  rj_vm_ip_version_t version{99, 98, 97};
-  EXPECT_EQ(rj_vm_config_gpu_ip_version(config.get(), 0, UINT32_MAX, &version),
-            ROCJITSU_STATUS_UNSUPPORTED);
-  EXPECT_EQ(version.major, 99u);
-  EXPECT_EQ(version.minor, 98u);
-  EXPECT_EQ(version.revision, 97u);
-  EXPECT_EQ(rj_vm_config_gpu_ip_version(config.get(), 1, 11, &version),
-            ROCJITSU_STATUS_INVALID_ARGUMENT);
-  EXPECT_EQ(version.major, 99u);
   uint32_t count = 99;
   EXPECT_EQ(rj_vm_config_gpu_count(nullptr, &count), ROCJITSU_STATUS_INVALID_ARGUMENT);
   EXPECT_EQ(count, 99u);
@@ -148,10 +127,9 @@ TEST_P(VmConfigTest, ReplicatedIdentitiesStayWithinBusAddressSpace) {
   EXPECT_EQ(unchanged, raw);
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    Targets, VmConfigTest,
-    testing::Values(ConfigCase{"gfx1151.json", 5510, 110501, {11, 5, 1}, {6, 1, 1}},
-                    ConfigCase{"gfx1201_r9700.json", 8716, 120001, {12, 0, 1}, {7, 0, 1}}));
+INSTANTIATE_TEST_SUITE_P(Targets, VmConfigTest,
+                         testing::Values(ConfigCase{"gfx1151.json", 5510, 110501},
+                                         ConfigCase{"gfx1201_r9700.json", 8716, 120001}));
 
 TEST(VmConfigArgumentsTest, FailedConstructionPreservesOutput) {
   rj_vm_config_t *const sentinel = reinterpret_cast<rj_vm_config_t *>(uintptr_t{1});
