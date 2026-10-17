@@ -4707,6 +4707,58 @@ TEST(CommandProcessorTest, KfdQueueRequestsResizesAndReclaimsDynamicScratchBefor
   })) << "the CP used a physical wave slot beyond COMPUTE_TMPRING_SIZE.WAVES";
 }
 
+TEST(CommandProcessorTest, AqlPublicationAcceptsOutOfOrderDoorbells) {
+  constexpr uint32_t kQueueId = 20;
+  constexpr uint64_t kRing = 0xF0100000;
+  constexpr uint64_t kReadPointer = kRing + 256;
+  constexpr uint64_t kWritePointer = kReadPointer + 8;
+  constexpr uint64_t kFirstSignal = kRing + 512;
+  constexpr uint64_t kSecondSignal = kFirstSignal + 64;
+
+  for (const bool observe_later_first : {false, true}) {
+    SCOPED_TRACE(observe_later_first);
+    VmFixture fixture("cdna4", /*num_cus=*/1);
+    fixture.mem()->write32(kRing, HSA_PACKET_TYPE_INVALID);
+    fixture.mem()->write32(kRing + amdgpu::kAqlPacketBytes, HSA_PACKET_TYPE_INVALID);
+    fixture.mem()->write64(kReadPointer, 0);
+    fixture.mem()->write64(kWritePointer, 2);
+    fixture.mem()->write64(kFirstSignal + 8, 1);
+    fixture.mem()->write64(kSecondSignal + 8, 1);
+    amdgpu::ComputeQueueConfig queue{};
+    queue.queue_id = kQueueId;
+    queue.ring_base_va = kRing;
+    queue.ring_size = 4 * amdgpu::kAqlPacketBytes;
+    queue.read_ptr_va = kReadPointer;
+    queue.write_ptr_va = kWritePointer;
+    queue.doorbell_mode = amdgpu::QueueDoorbellMode::Explicit;
+    const uint64_t registration = fixture.cp()->register_queue(std::move(queue));
+    ASSERT_NE(registration, 0u);
+
+    hsa_barrier_and_packet_t packet{};
+    packet.header = HSA_PACKET_TYPE_BARRIER_AND;
+    packet.completion_signal.handle = kSecondSignal;
+    fixture.mem()->load_image(reinterpret_cast<const uint8_t *>(&packet), sizeof(packet),
+                              kRing + amdgpu::kAqlPacketBytes);
+    fixture.cp()->notify_queue_doorbell(registration, 1);
+    if (observe_later_first) {
+      ASSERT_TRUE(fixture.engine->step());
+      EXPECT_EQ(fixture.mem()->read64(kReadPointer), 0u);
+      EXPECT_EQ(fixture.mem()->read64(kSecondSignal + 8), 1u);
+    }
+
+    // The lower-index publisher can overwrite the doorbell before the CP sees
+    // the higher index. Reservation and valid headers still expose both slots.
+    packet.completion_signal.handle = kFirstSignal;
+    fixture.mem()->load_image(reinterpret_cast<const uint8_t *>(&packet), sizeof(packet), kRing);
+    fixture.cp()->notify_queue_doorbell(registration, 0);
+    fixture.engine->run();
+    EXPECT_EQ(fixture.mem()->read64(kReadPointer), 2u);
+    EXPECT_EQ(fixture.mem()->read64(kFirstSignal + 8), 0u);
+    EXPECT_EQ(fixture.mem()->read64(kSecondSignal + 8), 0u);
+    EXPECT_FALSE(fixture.cp()->queue_faulted_for_test(kQueueId, 0));
+  }
+}
+
 TEST(CommandProcessorTest, DynamicScratchRequestBlocksRemovalOnlyUntilDelivery) {
   using namespace rocr::llvm::amdhsa;
 

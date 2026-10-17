@@ -4454,7 +4454,6 @@ void CommandProcessor::fetch_from_queue(ComputeQueueRecord &queue, simdojo::Tick
                         write_idx - read_idx);
   });
 
-  // AQL doorbell clamping (compute queues only).
   // Use the CP-private fetch cursor as the authoritative next-packet index. It
   // normally equals read_ptr_va (the CP is the sole writer of a compute queue's
   // read pointer), but while the debugger holds read_ptr_va at a trapped
@@ -4466,20 +4465,15 @@ void CommandProcessor::fetch_from_queue(ComputeQueueRecord &queue, simdojo::Tick
   if (queue.doorbell_mode != QueueDoorbellMode::VmPolled) {
     const uint64_t doorbell = queue.last_doorbell;
     // KFD initializes a new queue's doorbell to UINT64_MAX, meaning that no
-    // packet has been published yet. The producer may reserve a ring slot by
-    // advancing write_ptr before it initializes the packet and release-stores
-    // the header. Treating the sentinel as an unclamped producer cursor lets a
-    // concurrent CP read that partially initialized slot.
+    // packet has been published yet. After the first notification, the reserved
+    // write frontier and each acquired valid header govern packet admission.
+    // MULTI producers may ring in decreasing order, and host polling can miss
+    // the higher notification entirely, so the last doorbell is not a limit.
     if (doorbell == std::numeric_limits<uint64_t>::max())
       return;
-    uint64_t doorbell_limit = doorbell + 1;
-    if (doorbell_limit < process_limit)
-      process_limit = doorbell_limit;
-    if (read_idx >= process_limit)
-      return;
-  } else if (read_idx >= process_limit) {
-    return;
   }
+  if (read_idx >= process_limit)
+    return;
 
   static_assert(sizeof(hsa_kernel_dispatch_packet_t) == kAqlPacketBytes);
   const uint32_t num_slots = queue.ring_size / kAqlPacketBytes;
