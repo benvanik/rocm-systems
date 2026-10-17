@@ -201,8 +201,11 @@ TEST_F(Pm4PacketProcessorTest, ProcessesRegisterWriteAcrossNativeRingWrap) {
   EXPECT_EQ(memory->load<uint32_t>(kReadPointer), 3u);
 }
 
-TEST_F(Pm4PacketProcessorTest, MaskedPredExecRetainsSkippedCursorAcrossPublicationRetry) {
-  context.arch = ROCJITSU_CODE_ARCH_CDNA3;
+class Pm4PredExecTest : public Pm4PacketProcessorTest,
+                        public ::testing::WithParamInterface<rj_code_arch_t> {};
+
+TEST_P(Pm4PredExecTest, MaskedPredExecRetainsSkippedCursorAcrossPublicationRetry) {
+  context.arch = GetParam();
   context.xcc_id = 0;
   const std::array words{0xc0002300u, (1u << 25) | 5u, 0xc0033700u, 5u << 8, kOutput, 0u, 99u};
   submit(words, true, 6, 8);
@@ -217,6 +220,20 @@ TEST_F(Pm4PacketProcessorTest, MaskedPredExecRetainsSkippedCursorAcrossPublicati
   EXPECT_EQ(memory->load<uint32_t>(kOutput), 0u);
   EXPECT_TRUE(completed);
 }
+
+TEST_P(Pm4PredExecTest, SelectedPredExecExecutesOnHighestVirtualXcc) {
+  context.arch = GetParam();
+  context.xcc_id = 7;
+  const std::array words{0xc0002300u, (1u << 31) | 5u, 0xc0033700u, 5u << 8, kOutput, 0u, 99u};
+  submit(words);
+  EXPECT_EQ(service(), Pm4TestStatus::Ready);
+  EXPECT_EQ(memory->load<uint32_t>(kOutput), 99u);
+  EXPECT_TRUE(completed);
+}
+
+INSTANTIATE_TEST_SUITE_P(Cdna, Pm4PredExecTest,
+                         ::testing::Values(ROCJITSU_CODE_ARCH_CDNA3, ROCJITSU_CODE_ARCH_CDNA4,
+                                           ROCJITSU_CODE_ARCH_CDNA5));
 
 TEST_F(Pm4PacketProcessorTest, CondExecRetainsSkippedCursorAcrossPublicationRetry) {
   constexpr uint32_t kPredicate = kOutput + 16;
