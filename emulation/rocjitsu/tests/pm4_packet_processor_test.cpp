@@ -57,6 +57,7 @@ public:
   }
 
   AtomicLoadResult atomic_load(VmMemoryDomain, uint64_t address, uint32_t width) override {
+    atomic_load_addresses_.push_back(address);
     if ((width != 4 && width != 8) || address % width != 0 || address > bytes_.size() ||
         width > bytes_.size() - address)
       return {.outcome = VmAccessOutcome::Malformed};
@@ -67,6 +68,7 @@ public:
 
   VmAccessOutcome atomic_store(VmMemoryDomain, uint64_t address, uint32_t width,
                                uint64_t value) override {
+    atomic_store_addresses_.push_back(address);
     if ((width != 4 && width != 8) || address % width != 0 || address > bytes_.size() ||
         width > bytes_.size() - address)
       return VmAccessOutcome::Malformed;
@@ -99,12 +101,18 @@ public:
   }
 
   void make_read_unavailable(uint64_t address) { unavailable_read_ = address; }
+  const std::vector<uint64_t> &atomic_load_addresses() const { return atomic_load_addresses_; }
+  const std::vector<uint64_t> &atomic_store_addresses() const { return atomic_store_addresses_; }
   void make_store_unavailable_once(uint64_t address) { unavailable_store_once_ = address; }
   void make_store_faulted_once(uint64_t address) {
     store_outcome_once_ = std::pair{address, VmAccessOutcome::Faulted};
   }
 
 private:
+  // Atomic observations distinguish synchronization packets from byte copies.
+  std::vector<uint64_t> atomic_load_addresses_;
+  // Atomic publications include payloads and the native consumer cursor.
+  std::vector<uint64_t> atomic_store_addresses_;
   std::vector<std::byte> bytes_;
   std::optional<uint64_t> unavailable_read_;
   std::optional<uint64_t> unavailable_store_once_;
@@ -375,12 +383,138 @@ TEST_F(Pm4PacketProcessorTest, WaitBlocksLaterMemoryEffectsUntilItsConditionPass
                          0u,          0xc0033700u, 0x100u,  kOutput + 4, 0u, 0xdeadbeefu};
   submit(words);
   EXPECT_EQ(service(), Pm4TestStatus::Blocked);
+  EXPECT_EQ(std::ranges::count(memory->atomic_load_addresses(), kOutput), 1);
   EXPECT_EQ(memory->load<uint32_t>(kOutput + 4), 0u);
   EXPECT_EQ(queue.commands.submissions.front().buffers.front().address, kRing);
   memory->store<uint32_t>(kOutput, 1);
   EXPECT_EQ(service(), Pm4TestStatus::Ready);
+  EXPECT_EQ(std::ranges::count(memory->atomic_load_addresses(), kOutput), 2);
   EXPECT_EQ(memory->load<uint32_t>(kOutput + 4), 0xdeadbeefu);
   EXPECT_TRUE(completed);
+}
+
+TEST_F(Pm4PacketProcessorTest, ReleaseInterruptObservesPayloadBeforeABlockedTail) {
+  for (uint32_t selection : {1u, 2u}) {
+    SCOPED_TRACE(selection);
+    const uint32_t gate = kOutput + 16;
+    memory->store<uint64_t>(kOutput, 0);
+    memory->store<uint32_t>(gate, 0);
+    const std::array words{0xc0064900u, 0x528u, (selection << 29) | (2u << 24),
+                           kOutput,     0u,     0x12345678u,
+                           0x87654321u, 47u,    0xc0053c00u,
+                           0x13u,       gate,   0u,
+                           1u,          ~0u,    0u};
+    queue.process_id = 19;
+    uint32_t interrupts = 0;
+    InterruptSubscription subscription([&](uint32_t process, uint32_t event) {
+      EXPECT_EQ(process, 19u);
+      EXPECT_EQ(event, 47u);
+      EXPECT_EQ(memory->load<uint64_t>(kOutput),
+                selection == 1 ? UINT64_C(0x12345678) : UINT64_C(0x8765432112345678));
+      EXPECT_FALSE(completed);
+      ++interrupts;
+    });
+    queue.interrupt_sink = subscription.sink();
+    completed = false;
+    submit(words);
+    EXPECT_EQ(service(), Pm4TestStatus::Blocked);
+    EXPECT_EQ(std::ranges::count(memory->atomic_store_addresses(), kOutput), selection);
+    EXPECT_EQ(interrupts, 1u);
+    EXPECT_FALSE(completed);
+    memory->store<uint32_t>(gate, 1);
+    EXPECT_EQ(service(), Pm4TestStatus::Ready);
+    EXPECT_EQ(interrupts, 1u);
+    EXPECT_TRUE(completed);
+  }
+}
+
+TEST_F(Pm4PacketProcessorTest, NonReturningExchangeUsesAtomicStoreAtBothWidths) {
+  for (uint32_t control : {7u, 0x27u}) {
+    SCOPED_TRACE(control);
+    memory->store<uint64_t>(kOutput, 0);
+    const std::array words{0xc0071e00u, control, kOutput, 0u, 0x12345678u, 0x87654321u, 0u, 0u, 0u};
+    submit(words);
+    EXPECT_EQ(service(), Pm4TestStatus::Ready);
+    EXPECT_EQ(memory->load<uint64_t>(kOutput),
+              control == 7 ? UINT64_C(0x12345678) : UINT64_C(0x8765432112345678));
+  }
+  EXPECT_EQ(std::ranges::count(memory->atomic_store_addresses(), kOutput), 2);
+}
+
+TEST_F(Pm4PacketProcessorTest, ReleaseWithoutInterruptStillPublishesData) {
+  uint32_t interrupts = 0;
+  InterruptSubscription subscription([&](uint32_t, uint32_t) { ++interrupts; });
+  queue.interrupt_sink = subscription.sink();
+  for (uint32_t control : {0u, 3u}) {
+    SCOPED_TRACE(control);
+    memory->store<uint32_t>(kOutput, 0);
+    const std::array words{0xc0064900u, 0x528u, (1u << 29) | (control << 24), kOutput, 0u, 31u,
+                           0u,          47u};
+    submit(words);
+    EXPECT_EQ(service(), Pm4TestStatus::Ready);
+    EXPECT_EQ(memory->load<uint32_t>(kOutput), 31u);
+    EXPECT_EQ(interrupts, 0u);
+  }
+}
+
+TEST_F(Pm4PacketProcessorTest, ReleaseInterruptWithoutDataDoesNotAccessTheAddress) {
+  uint32_t interrupts = 0;
+  queue.process_id = 19;
+  InterruptSubscription subscription([&](uint32_t process, uint32_t event) {
+    EXPECT_EQ(process, 19u);
+    EXPECT_EQ(event, 47u);
+    ++interrupts;
+  });
+  queue.interrupt_sink = subscription.sink();
+  for (uint32_t control : {1u, 4u}) {
+    SCOPED_TRACE(control);
+    const std::array words{0xc0064900u, 0x528u, control << 24, ~0u, ~0u, 0u, 0u, 47u};
+    submit(words);
+    EXPECT_EQ(service(), Pm4TestStatus::Ready);
+  }
+  EXPECT_EQ(interrupts, 2u);
+}
+
+TEST_F(Pm4PacketProcessorTest, FailedReleasePublicationDoesNotNotify) {
+  uint32_t interrupts = 0;
+  InterruptSubscription subscription([&](uint32_t, uint32_t) { ++interrupts; });
+  queue.interrupt_sink = subscription.sink();
+  const std::array words{0xc0064900u, 0x528u, (1u << 29) | (2u << 24), 0x4000u, 0u, 31u, 0u, 47u};
+  submit(words);
+  EXPECT_EQ(service(), Pm4TestStatus::Faulted);
+  EXPECT_EQ(interrupts, 0u);
+}
+
+TEST_F(Pm4PacketProcessorTest, ReleaseInterruptIsNotReplayedAfterCursorPublicationRetry) {
+  uint32_t interrupts = 0;
+  InterruptSubscription subscription([&](uint32_t, uint32_t) { ++interrupts; });
+  queue.interrupt_sink = subscription.sink();
+  const std::array words{0xc0064900u, 0x528u, (1u << 29) | (2u << 24), kOutput, 0u, 31u, 0u, 47u};
+  submit(words, true);
+  memory->make_store_unavailable_once(kReadPointer);
+  EXPECT_EQ(service(), Pm4TestStatus::Blocked);
+  EXPECT_EQ(interrupts, 1u);
+  EXPECT_TRUE(queue.read_pointer_journal.publication_pending());
+  EXPECT_EQ(service(), Pm4TestStatus::Ready);
+  EXPECT_EQ(interrupts, 1u);
+  EXPECT_TRUE(completed);
+}
+
+TEST_F(Pm4PacketProcessorTest, RejectsConditionalReleaseInterruptsBeforeEffects) {
+  uint32_t interrupts = 0;
+  InterruptSubscription subscription([&](uint32_t, uint32_t) { ++interrupts; });
+  queue.interrupt_sink = subscription.sink();
+  for (uint32_t control : {5u, 6u, 7u}) {
+    SCOPED_TRACE(control);
+    queue.faulted = false;
+    queue.commands.submissions.clear();
+    const std::array words{0xc0064900u, 0x528u, (1u << 29) | (control << 24), kOutput, 0u, 31u,
+                           0u,          47u};
+    submit(words);
+    EXPECT_EQ(service(), Pm4TestStatus::Faulted);
+    EXPECT_EQ(memory->load<uint32_t>(kOutput), 0u);
+    EXPECT_EQ(interrupts, 0u);
+  }
 }
 
 TEST_F(Pm4PacketProcessorTest, DispatchPausesInterpretationUntilCpRetiresIt) {
