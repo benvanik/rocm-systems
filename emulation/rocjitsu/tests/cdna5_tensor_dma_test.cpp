@@ -4089,6 +4089,7 @@ public:
   std::vector<uint64_t> addresses;
 };
 
+#if !defined(RJ_DISABLE_HOST_FAULT_RECOVERY)
 TEST(Gfx1250ExecutionTest, TensorDmaCoalescingPreservesClippedAndRefusedExtents) {
   using namespace amdgpu::tensor_dma_detail;
   constexpr uint32_t kProcessId = 81251;
@@ -4172,5 +4173,6 @@ TEST(Gfx1250ExecutionTest, TensorDmaCoalescingPreservesClippedAndRefusedExtents)
   }
   ASSERT_TRUE(legacy_vm.unregister_address_space(address_space));
 }
+#endif
 
 } // namespace
