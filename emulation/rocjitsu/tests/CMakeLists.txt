@@ -475,6 +475,7 @@ add_executable(
     canonical_line_freshness_test.cpp
     legacy_page_table_cache_test.cpp
     config_test.cpp
+    rj_vm_config_test.cpp
     checkpoint_restore_errors_test.cpp
     rj_arith_policy_test.cpp
     rj_arith_config_test.cpp
@@ -2408,6 +2409,36 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
             PROPERTIES ENVIRONMENT "LD_PRELOAD="
         )
     endif()
+
+    # Compile as C and link only the shared library's public ABI.
+    add_executable(vm_config_c_api_test vm_config_c_api_test.c)
+    target_link_libraries(vm_config_c_api_test PRIVATE rocjitsu_shared)
+    if(RJ_ENABLE_UBSAN AND RJ_UBSAN_VPTR)
+        # Compile the consumer as C, but link the C++ runtime needed by the
+        # instrumented library's vptr checks.
+        set_target_properties(
+            vm_config_c_api_test
+            PROPERTIES LINKER_LANGUAGE CXX
+        )
+    endif()
+    target_include_directories(
+        vm_config_c_api_test
+        PRIVATE ${PROJECT_SOURCE_DIR}/lib/rocjitsu/include
+    )
+    rj_configure_target(vm_config_c_api_test WARNINGS)
+    add_test(
+        NAME VmConfigCApi
+        COMMAND
+            vm_config_c_api_test
+            ${CMAKE_CURRENT_SOURCE_DIR}/race-detector/race_test_config.json
+    )
+    # An installed ROCm SDK may provide an older library with the same SONAME.
+    set_tests_properties(
+        VmConfigCApi
+        PROPERTIES
+            ENVIRONMENT_MODIFICATION
+                "LD_LIBRARY_PATH=path_list_prepend:$<TARGET_FILE_DIR:rocjitsu_shared>"
+    )
 
     # Resolve only public C symbols through RTLD_LOCAL. Linking simulator
     # objects here would hide whether an ordinary embedder can map its handles.
